@@ -1,32 +1,23 @@
-# README
+# vLLM Benchmark: GPU Memory Tier, Batching, and Throughput-Latency Trade-offs in LLM Serving
 
-# Throughput and Latency Trade-offs in vLLM-Based LLM Serving: A GPU Memory-Tier Study and an Empirical Calibration Rule for max_num_seqs
+Companion code and data repository for the paper *"Throughput-Latency Trade-offs in GPU-Tiered LLM Serving"* (Kurbanov & Rakhimov, submitted to PeerJ Computer Science).
 
-## Overview
+## Description
 
-This repository contains the benchmark implementation, experimental configurations, and benchmark datasets used in the research paper **"Throughput and Latency Trade-offs in vLLM-Based LLM Serving: A GPU Memory-Tier Study and an Empirical Calibration Rule for max_num_seqs."**
+This repository contains everything needed to reproduce the stress-test benchmarks reported in the paper: the benchmarking client used to load-test a running [vLLM](https://github.com/vllm-project/vllm) server, launch scripts for each model, the full curated dataset of results, plotting code, and the analysis script that computes the paper's proposed empirical calibration rule (N*) for choosing `max_num_seqs`.
 
-The objective of this project is to evaluate how different **max_num_seqs** values influence throughput and latency in vLLM inference serving under different GPU memory capacities.
+The study benchmarks four open-weight, instruction-tuned language models — Qwen2.5-1.5B-Instruct, Llama-3.2-3B-Instruct, Gemma-2-2B-Instruct, and Mistral-7B-Instruct-v0.3 — served through vLLM on two GPU tiers (a 24 GB NVIDIA L4 and a 96 GB NVIDIA RTX PRO), sweeping the scheduler's `max_num_seqs` concurrency parameter across five values (16, 32, 64, 128, 256). For each of the 40 resulting configurations, 10,000 concurrent chat-completion requests were sent through a 128-worker thread pool, and throughput and latency percentiles were recorded.
 
-The experiments compare two GPU memory tiers:
-
-* NVIDIA L4 (24 GB VRAM)
-* NVIDIA RTX PRO (96 GB VRAM)
-
-Four open-source Large Language Models (LLMs) were evaluated under identical benchmarking conditions.
-
----
-
-# Repository Structure
+## Repository Structure
 
 ```text
 .
 ├── README.md
-├── benchmark.py
-├── make_plots.py
+├── benchmark.py            # benchmarking client
+├── make_plots.py           # regenerates plots/*.png from the CSV
 ├── requirements.txt
-├── benchmark_results.csv
-├── benchmark_results.xlsx
+├── benchmark_results.csv   # curated dataset (40 rows)
+├── benchmark_results.xlsx  # same dataset, Excel format
 ├── server/
 │   ├── qwen.sh
 │   ├── llama.sh
@@ -38,266 +29,122 @@ Four open-source Large Language Models (LLMs) were evaluated under identical ben
 │   ├── p95_latency.png
 │   └── p99_latency.png
 ├── analysis/
-│   └── calibration_rule.py
+│   └── calibration_rule.py # reproduces the paper's N* diagnostic rule
 └── LICENSE
 ```
 
----
-
-# Hardware Configuration
+## Hardware Configuration
 
 Two GPU configurations were benchmarked.
 
 | Configuration | GPU            | VRAM  |
-| ------------- | -------------- | ----- |
-| Low Pod       | NVIDIA L4      | 24 GB |
-| High Pod      | NVIDIA RTX PRO | 96 GB |
+| -------------- | --------------- | ----- |
+| Low Pod        | NVIDIA L4       | 24 GB |
+| High Pod       | NVIDIA RTX PRO  | 96 GB |
 
----
-
-# Software Environment
+## Software Environment
 
 The experiments were conducted using:
 
-* Python
-* vLLM
-* OpenAI Python SDK
-* ThreadPoolExecutor
-* RunPod
-* CUDA
-* HuggingFace Transformers
+- Python
+- vLLM
+- OpenAI Python SDK
+- ThreadPoolExecutor
+- RunPod
+- CUDA
+- Hugging Face Transformers
 
----
-
-# Tested Models
-
-The following instruction-tuned models were evaluated.
+## Tested Models
 
 | Model                    |
-| ------------------------ |
-| Qwen2.5-1.5B-Instruct    |
-| Llama-3.2-3B-Instruct    |
-| Gemma-2-2B-Instruct      |
-| Mistral-7B-Instruct-v0.3 |
+| ------------------------- |
+| Qwen2.5-1.5B-Instruct     |
+| Llama-3.2-3B-Instruct     |
+| Gemma-2-2B-Instruct       |
+| Mistral-7B-Instruct-v0.3  |
 
----
+## Dataset Information
 
-# Experimental Design
+The curated dataset is provided in both `benchmark_results.csv` and `benchmark_results.xlsx`. It contains one row per (model, GPU, `max_num_seqs`) configuration — 40 rows in total.
 
-The benchmark compares inference performance across different batch scheduling configurations.
+**Columns:**
 
-Each experiment used:
+| Column | Description |
+|---|---|
+| `model` | Model name (Hugging Face identifier style) |
+| `gpu` | GPU used to serve the model (`NVIDIA-L4-24GB` or `NVIDIA-RTX-PRO-96GB`) |
+| `max_num_seqs` | vLLM scheduler concurrency limit tested (16, 32, 64, 128, or 256) |
+| `kv_cache_dtype` | KV-cache precision used (`auto` or `fp8`; FP8 was used only for Llama-3.2-3B-Instruct) |
+| `total_requests` | Total number of chat-completion requests sent in this run (10,000 for every row) |
+| `successful_requests` | Number of requests that completed without error |
+| `failed_requests` | Number of requests that failed (0 for every configuration in this study) |
+| `benchmark_time_sec` | Total wall-clock time for the run, in seconds |
+| `throughput_req_per_sec` | `successful_requests / benchmark_time_sec` |
+| `mean_latency_sec` | Mean per-request latency, in seconds |
+| `median_latency_sec` | Median per-request latency, in seconds |
+| `p95_latency_sec` | 95th-percentile per-request latency, in seconds |
+| `p99_latency_sec` | 99th-percentile per-request latency, in seconds |
+| `min_latency_sec` | Minimum observed per-request latency, in seconds |
+| `max_latency_sec` | Maximum observed per-request latency, in seconds |
 
-* 10,000 inference requests
-* 128 concurrent workers
-* OpenAI-compatible API
-* Same benchmark client
-* Same prompt
-* Same request format
+No personally identifiable or sensitive information is contained in this dataset; all values are system performance measurements. The complete study contains 2 GPU platforms x 4 LLMs x 5 scheduling configurations = 40 benchmark experiments, each with a 100% request success rate.
 
-Each model was evaluated using:
+## Code Information
 
-* max_num_seqs = 16
-* max_num_seqs = 32
-* max_num_seqs = 64
-* max_num_seqs = 128
-* max_num_seqs = 256
+| File | Purpose |
+|---|---|
+| `benchmark.py` | Benchmarking client. Sends a configurable number of concurrent chat-completion requests to a running vLLM server and reports throughput and latency statistics. Used to generate every row of `benchmark_results.csv`. |
+| `server/qwen.sh`, `server/llama.sh`, `server/gemma.sh`, `server/mistral.sh` | vLLM launch scripts, one per model, with `max_num_seqs` as an optional argument. |
+| `make_plots.py` | Regenerates the four PNG charts in `plots/` directly from `benchmark_results.csv`. |
+| `analysis/calibration_rule.py` | Reads `benchmark_results.csv` and reproduces the paper's empirical calibration rule: the marginal throughput gain `g(N)` from doubling `max_num_seqs`, and the resulting diagnostic recommendation `N*` under a chosen gain threshold epsilon. |
 
-The complete study therefore contains:
+For each request, the benchmark client measures success/failure and response latency. After all requests complete, it reports: throughput (requests/second), and mean, median, P95, P99, minimum, and maximum latency.
 
-* 2 GPU platforms
-* 4 LLMs
-* 5 scheduling configurations
-* 40 benchmark experiments
+## Usage Instructions
 
----
-
-# Benchmark Client
-
-The benchmark client communicates with the vLLM OpenAI-compatible API.
-
-For each request it measures:
-
-* Success rate
-* Response latency
-* Throughput
-* Benchmark duration
-
-After all requests complete, the following statistics are calculated:
-
-* Average latency
-* Median latency
-* P95 latency
-* P99 latency
-* Minimum latency
-* Maximum latency
-* Throughput (requests/second)
-
----
-
-# Running the Server
-
-Example:
-
-```bash
-vllm serve Qwen/Qwen2.5-1.5B-Instruct \
-    --dtype auto \
-    --api-key token-abc123 \
-    --port 1105 \
-    --gpu-memory-utilization 0.90 \
-    --max-num-seqs 64
-```
-
-For Llama experiments FP8 KV Cache was enabled.
-
-```bash
-vllm serve meta-llama/Llama-3.2-3B-Instruct \
-    --dtype auto \
-    --api-key token-abc123 \
-    --port 1105 \
-    --gpu-memory-utilization 0.90 \
-    --max-num-seqs 64 \
-    --kv-cache-dtype fp8
-```
-
----
-
-# Running the Benchmark
-
-Run the benchmark after the server starts.
-
-```bash
-python benchmark.py
-```
-
-The benchmark automatically sends 10,000 requests and computes the performance statistics.
-
----
-
-# Output Metrics
-
-For every experiment the following metrics are reported.
-
-| Metric          | Description           |
-| --------------- | --------------------- |
-| Benchmark Time  | Total execution time  |
-| Throughput      | Requests per second   |
-| Average Latency | Mean response latency |
-| Median Latency  | 50th percentile       |
-| P95 Latency     | 95th percentile       |
-| P99 Latency     | 99th percentile       |
-| Minimum Latency | Fastest response      |
-| Maximum Latency | Slowest response      |
-
----
-
-# Dataset Description
-
-The repository includes the complete benchmark dataset used in the paper.
-
-Each record contains:
-
-* GPU
-* GPU Memory
-* Model
-* max_num_seqs
-* Number of Requests
-* Benchmark Time
-* Throughput
-* Average Latency
-* Median Latency
-* P95 Latency
-* P99 Latency
-* Minimum Latency
-* Maximum Latency
-
-The benchmark dataset contains all 40 experimental runs reported in the manuscript.
-
----
-
-# Methodology
-
-The benchmark methodology consists of the following steps.
-
-1. Deploy a vLLM server using one of the selected LLMs.
-2. Configure the desired value of `max_num_seqs`.
-3. Launch the benchmark client.
-4. Send 10,000 concurrent inference requests.
-5. Record request completion time.
-6. Calculate throughput and latency statistics.
-7. Repeat the procedure for every GPU platform and every model.
-
----
-
-# Reproducing the Results
-
-To reproduce the experiments:
-
-### Step 1
-
-Clone the repository.
+### 1. Install dependencies
 
 ```bash
 git clone https://github.com/kurbanovxurshidbek/vllm-benchmark.git
-```
-
-### Step 2
-
-Install the required packages.
-
-```bash
+cd vllm-benchmark
 pip install -r requirements.txt
 ```
 
-### Step 3
+### 2. Start a vLLM server
 
-Start the vLLM server.
-
-```bash
-bash server/qwen.sh
-```
-
-or
+Pick one of the four launch scripts and optionally pass a `max_num_seqs` value (default: 64):
 
 ```bash
-bash server/llama.sh
+bash server/qwen.sh 64
+# or: bash server/llama.sh 64
+# or: bash server/gemma.sh 64
+# or: bash server/mistral.sh 64
 ```
 
-or
+### 3. Run the benchmark
+
+In a separate terminal:
 
 ```bash
-bash server/gemma.sh
+python benchmark.py --model Qwen/Qwen2.5-1.5B-Instruct
 ```
 
-or
+All arguments have defaults, so `python benchmark.py` alone works against a server started with `server/qwen.sh`. To reproduce a specific row of `benchmark_results.csv`, match the `--model` to the launch script and the server's `--max-num-seqs` to your chosen value, then save the summary:
 
 ```bash
-bash server/mistral.sh
+python benchmark.py \
+    --model meta-llama/Llama-3.2-3B-Instruct \
+    --total-requests 10000 \
+    --max-workers 128 \
+    --output results_llama_seqs64_l4.csv
 ```
 
-### Step 4
-
-Run the benchmark.
-
-```bash
-python benchmark.py
-```
-
-### Step 5
-
-Collect benchmark statistics.
-
----
-
-# Expected Output
-
-The benchmark prints results similar to:
+Expected output:
 
 ```text
-====================================================
+============================================================
 Benchmark Summary
-====================================================
-
+============================================================
 Total Requests : 10000
 Success        : 10000
 Failed         : 0
@@ -313,11 +160,28 @@ Min Latency     : x.xxx sec
 Max Latency     : x.xxx sec
 ```
 
----
+Repeat for each combination of model, GPU, and `max_num_seqs` to reproduce the full 40-configuration sweep reported in the paper.
 
-# Requirements
+### 4. Regenerate the plots (optional)
 
-Recommended Python packages:
+```bash
+python make_plots.py
+```
+
+### 5. Reproduce the calibration-rule analysis
+
+```bash
+python analysis/calibration_rule.py --csv benchmark_results.csv --epsilon 0.15
+```
+
+This prints the marginal throughput gain at each doubling step and the resulting N* value for all eight model-GPU pairs, matching Table 5 in the paper.
+
+## Requirements
+
+- Python 3.9+
+- A running [vLLM](https://github.com/vllm-project/vllm) server for `benchmark.py` (not required for `analysis/calibration_rule.py` or `make_plots.py`, which only need the CSV)
+
+Recommended Python packages (`requirements.txt`):
 
 ```text
 openai
@@ -328,38 +192,24 @@ accelerate
 sentencepiece
 ```
 
-Install using:
+Install with:
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+## Methodology
 
-# Citation
+1. Deploy a vLLM server for one of the four models, with `dtype=auto`, `gpu-memory-utilization=0.90`, and a fixed `max-num-seqs` (FP8 KV cache additionally enabled for Llama-3.2-3B-Instruct).
+2. Launch the benchmark client, which sends 10,000 chat-completion requests (prompt: `"Hello!"`) through a 128-worker thread pool.
+3. Record total wall-clock time, per-request latency, and success/failure for every request.
+4. Compute throughput and latency percentiles (mean, median, P95, P99, min, max) over all completed requests.
+5. Repeat for every combination of model, GPU tier, and `max_num_seqs`, yielding the 40 rows in `benchmark_results.csv`.
+6. Apply the marginal-gain diagnostic (`analysis/calibration_rule.py`) to the resulting throughput values to obtain the recommended `max_num_seqs` for each model-GPU pair.
 
-If you use this benchmark or dataset in your research, please cite the associated publication.
+Full methodological detail, including rationale and limitations, is given in the paper's Materials & Methods and Discussion sections.
 
-```bibtex
-@article{Kurbanov2026,
-  title={Throughput and Latency Trade-offs in vLLM-Based LLM Serving: A GPU Memory-Tier Study and an Empirical Calibration Rule for max_num_seqs},
-  author={Kurbanov, Xurshidbek and co-authors},
-  journal={PeerJ Computer Science},
-  year={2026}
-}
-```
-
----
-
-# License
-
-This repository is released under the [MIT License](LICENSE).
-
-Please cite the associated publication (see Citation section above) when using the benchmark implementation or experimental dataset.
-
----
-
-# Calibration Rule Analysis
+## Calibration Rule Analysis
 
 In addition to the raw benchmark data, this repository includes the script used to compute the paper's proposed empirical calibration rule for `max_num_seqs`.
 
@@ -375,16 +225,37 @@ The recommended value, `N*`, is the smallest tested `N` at which this gain drops
 N*(epsilon) = min{ N in {16, 32, 64, 128, 256} : g(N) < epsilon }
 ```
 
-To reproduce Table 5 from the paper directly from `benchmark_results.csv`:
+This requires only measured throughput values; no model-architecture information is needed. Note that `N*` is a throughput-only recommendation and provides no memory-safety guarantee on its own — see the Discussion section of the paper for the full derivation and scope of applicability.
 
-```bash
-python analysis/calibration_rule.py --csv benchmark_results.csv --epsilon 0.15
+## Citations
+
+If you use this code or dataset, please cite:
+
+> Kurbanov, K., & Rakhimov, M. A. K. (2026). Throughput-Latency Trade-offs in GPU-Tiered LLM Serving. *PeerJ Computer Science* (in press).
+
+```bibtex
+@article{Kurbanov2026,
+  title   = {Throughput-Latency Trade-offs in GPU-Tiered LLM Serving},
+  author  = {Kurbanov, Khurshidbek and Rakhimov, Mukhammad Abdu Kayumbek},
+  journal = {PeerJ Computer Science},
+  year    = {2026}
+}
 ```
 
-This requires only measured throughput values from the CSV; no model-architecture information is needed. See the Discussion section of the paper for the full derivation and its scope of applicability, including an explicit caveat that the rule provides no memory-safety guarantee on its own.
+This work builds on and cites the vLLM / PagedAttention paper:
 
----
+> Kwon, W., Li, Z., Zhuang, S., Sheng, Y., Zheng, L., Yu, C. H., Gonzalez, J., Zhang, H., & Stoica, I. (2023). Efficient memory management for large language model serving with PagedAttention. *Proceedings of the 29th ACM Symposium on Operating Systems Principles (SOSP '23)*.
 
-# Contact
+## License & Contribution Guidelines
 
-For questions regarding the benchmark implementation, experiments, or dataset, please contact the corresponding author through the contact information provided in the associated publication.
+This repository is released under the [MIT License](LICENSE).
+
+Contributions are welcome:
+
+1. Open an issue describing the proposed change or bug.
+2. Fork the repository and create a feature branch.
+3. Submit a pull request referencing the issue.
+
+## Contact
+
+For questions about the paper or this repository, contact the corresponding author at shamsun.com@gmail.com.
