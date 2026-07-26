@@ -1,0 +1,6 @@
+openai
+vllm
+transformers
+torch
+accelerate
+sentencepiece

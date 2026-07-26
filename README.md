@@ -23,6 +23,7 @@ Four open-source Large Language Models (LLMs) were evaluated under identical ben
 .
 ├── README.md
 ├── benchmark.py
+├── make_plots.py
 ├── requirements.txt
 ├── benchmark_results.csv
 ├── benchmark_results.xlsx
@@ -36,6 +37,8 @@ Four open-source Large Language Models (LLMs) were evaluated under identical ben
 │   ├── latency.png
 │   ├── p95_latency.png
 │   └── p99_latency.png
+├── analysis/
+│   └── calibration_rule.py
 └── LICENSE
 ```
 
@@ -350,9 +353,35 @@ If you use this benchmark or dataset in your research, please cite the associate
 
 # License
 
-This repository is released for research and academic purposes.
+This repository is released under the [MIT License](LICENSE).
 
-Please cite the associated publication when using the benchmark implementation or experimental dataset.
+Please cite the associated publication (see Citation section above) when using the benchmark implementation or experimental dataset.
+
+---
+
+# Calibration Rule Analysis
+
+In addition to the raw benchmark data, this repository includes the script used to compute the paper's proposed empirical calibration rule for `max_num_seqs`.
+
+For any tested value `N`, the marginal throughput gain from doubling concurrency is:
+
+```
+g(N) = [Throughput(2N) - Throughput(N)] / Throughput(N)
+```
+
+The recommended value, `N*`, is the smallest tested `N` at which this gain drops below a threshold epsilon (0.15 in the paper):
+
+```
+N*(epsilon) = min{ N in {16, 32, 64, 128, 256} : g(N) < epsilon }
+```
+
+To reproduce Table 5 from the paper directly from `benchmark_results.csv`:
+
+```bash
+python analysis/calibration_rule.py --csv benchmark_results.csv --epsilon 0.15
+```
+
+This requires only measured throughput values from the CSV; no model-architecture information is needed. See the Discussion section of the paper for the full derivation and its scope of applicability, including an explicit caveat that the rule provides no memory-safety guarantee on its own.
 
 ---
 
