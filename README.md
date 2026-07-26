@@ -219,29 +219,6 @@ Step 5
 
 Collect benchmark statistics.
 
-Expected Output
-
-The benchmark prints results similar to:
-
-====================================================
-Benchmark Summary
-====================================================
-
-Total Requests : 10000
-Success        : 10000
-Failed         : 0
-
-Benchmark Time : xx.xx sec
-Throughput     : xxx.xx req/sec
-
-Average Latency : x.xxx sec
-Median Latency  : x.xxx sec
-P95 Latency     : x.xxx sec
-P99 Latency     : x.xxx sec
-Min Latency     : x.xxx sec
-Max Latency     : x.xxx sec
-Requirements
-
 Recommended Python packages:
 
 openai
